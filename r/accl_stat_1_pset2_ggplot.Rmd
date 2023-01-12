@@ -1,0 +1,138 @@
+---
+title: "Assignment 2"
+author: "MinAh Kim"
+date: "2022-09-19"
+output: html_document
+---
+
+#all highway, not city
+
+
+## 1. 
+Read in the mpg.csv   Download mpg.csv dataset. How many rows and columns are there?
+
+```{r}
+mpg <- read.csv("mpg.csv")
+dim(mpg)
+```
+
+**A:**  There are 234 rows and 12 columns
+
+## 2.
+Create a scatterplot of displacement (displ) and highway miels per gallon efficiency (hwy). How would you describe the relationship between the two variables? What potential explanation can you come up with to explain the relationship, if there is one?
+```{r}
+library(ggplot2)
+ggplot(data=mpg, aes(x=displ, y=hwy))+
+  geom_point()
+
+```
+
+**A:**  It seems like the highway MPG efficiency lowers as engine displacement is greater. I suspect that having greater engine displacement usually means more number of cylinders. I can imagine the fuel efficiency decreasing as the fuel passes more cylinders and creates greater frictions.
+
+## 3.
+Add an additional variable--class--and color the points using this variable. What addition information does that provide? Are there any cars that have large engines (displ greater than 5) AND have highway MPG efficiency greater than 20?
+```{r}
+ggplot(data=mpg, aes(x=displ, y=hwy, color=class))+
+  geom_point()
+
+```
+
+**A:**  The color on the graph represents the type of the cars. (e.g. 2seater, compact, midsize...). It seems like 2seater have large engines but is more efficient than other cars such as suv and pickup. 
+
+## 4.
+Create a plot with scatterplot of highway miles per gallons and displacement with the points colored by class of vehicle and the plot split into facets by number of cylinders. Do most vehicles have 5 cylinders?
+```{r}
+ggplot(data=mpg, aes(x=displ, y=hwy, color=class))+
+  geom_point()+
+  facet_wrap(~cyl)
+```
+
+**A:**  No, five-cylinder engine is the least common option.
+
+## 5.
+Based on your plot, how would describe the relationship between displacement, highway fuel efficiency, class of vehicle, and number of cylinders?
+
+**A:**  The bigger the engine displacement, the lower the highway fuel efficiency is. Furthermore, I can observe a trend of the engine displacement increasing when the number of cylinder increases. Not surprisingly, therefore, the highway fuel efficiency tends to be low when the number of cylinders is big. The relationship between the class of vehicles and other factors are a bit more ambiguous. However, the similar type of cars would often have similar engines characteristics. For instance, mid size cars tend to have six cylinders and have around 20 to 30 highway MPG efficiency. The majority of SUVs also have eight cylinder engine with lower than 20 highway MPG and more than 4L engine displacement.
+
+## 6.
+Add the model of the vehicle to the plot using the label aesthetic so that each point is the the text of the model of the vehicle. How many different models are 5 cylinder vehicles? What are the 4 cylinder vehicles that get the worst fuel efficiency? What 8 cylinder vehicle gets the best highway fuel efficiency?
+
+```{r}
+library(plotly)
+
+p <- ggplot(data=mpg, aes(x=displ, y=hwy, label=class))+
+  geom_text(check_overlap = FALSE, vjust="inward",hjust="inward")+
+  facet_wrap(~cyl)
+
+ggplotly(p)
+
+```
+
+**A:**  
+
+Subcompact is the only model that have five cylinders.
+
+PickUp has the worst fuel efficiency among the four cylinder vehicles.
+
+2seater has the best highway fuel efficiency among the 8 cylinder vehicle
+
+
+## 7.
+Create a histogram of the highway miles per gallon. What does the plot show? What is a histogram useful for? Create another histogram of highway miles per gallon, but set the # of bins to a number other than the default. Describe what happens in the plot as you change the number of bins.
+
+```{r}
+ggplot(mpg, aes(x= hwy))+
+  geom_histogram()
+```
+
+**A: ** This histogram shows how many vehicles have a certain highway miles per gallon efficiency. A histogram is good to know the distribution of the data values. For instance, I can know that a lot of vehicles' highway MPG efficiency are around late 10 miles per gallon or mid 20 miles per gallon.
+
+```{r}
+ggplot(mpg, aes(x= hwy))+
+  geom_histogram(bins = 5)
+```
+
+Here, I change the number of bins to 5 instead of the default, 30. Since a bar in the histogram encompass more values than the graph above, it simplifies the trend more extensively than the previous graph. For example, this histogram does not show that there are not many cars that has the highway efficiency of early 20 MPG.
+
+## 8.
+Create a bar plot that shows the frequency counts of different manufacturers in the dataset. The most vehicles in the dataset come from which manufacturer? What is the difference between geom_col() and geom_bar()?
+```{r}
+ggplot(mpg, aes(x= manufacturer))+
+  geom_bar()+
+  coord_flip()
+```
+
+**A:**  The most vehicles from the data set come from "dodge". geom_col() represents the associated y values, but the geom_bar() calculates the count of the x values (when set as default - if not, the derived values from x) and draws the bar proportionately to those values.
+
+## 9.
+Create a bar plot that shows the frequency counts of different manufacturers in the dataset and fill the bars with color according to the number of cylinders. What are the top 3 manufacturers of 8 cylinder vehicles in the dataset? Which manufacturers have 5 cylinder vehicles in the dataset?
+```{r}
+ggplot(mpg, aes(x= manufacturer, fill = factor(cyl)))+
+  geom_bar()+
+  coord_flip()
+```
+
+**A:**  The top three manufacturers of 8 cylinder vehicles are dodge, ford, and chevrolet. Volkswagen is the only manufacturer that produces 5 cylinder vehicle. 
+
+## 10.
+Create a scatter plot of engine size (displacement) and highway fuel efficiency. Calculate the correlation coefficient and add it to the plot in the top right quadrant. Change the theme to the minimal. Adjust the text of the plot so that all text is size 15, Times font family, and bold faced. Add a title to the plot that concisely summarizes the main insight. Center the title.  Change the axis labels and use more informative labels than the variable names. Add a caption that specifies the number of observations in the dataset.
+```{r}
+library(ggpubr)
+
+ggplot(data=mpg, aes(x=displ, y=hwy))+
+  geom_point() +
+  stat_cor(method = "pearson", label.x = 5.5, label.y = 45) +
+  theme_minimal() +
+  theme(
+    text=element_text(size = 15, family = "Times", face = "bold"),
+    plot.title= element_text(hjust= 0.5)
+  ) +
+  labs (
+    title = "Negative Correlation between \nEngine Displacement and Highway Fuel Efficiency",
+    x = "Engine Displacement (L)",
+    y = "Highway Efficiency \n (Miles/Gallon)",
+    caption = paste("The number of observations: ", nrow(mpg))
+    )
+  
+```
+

@@ -1,0 +1,242 @@
+---
+title: "Assignment 4"
+author: "MinAh Kim"
+date: "2022-10-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. 
+Read in the data (housing.csv) on the Texas housing market. Print out summary statistics of the dataset.
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+
+df <- read.csv("housing.csv")
+summary(df)
+
+```
+
+
+## 2. 
+On average, during which month do the most sales take place?
+```{r} 
+most_sales <- df %>%
+  group_by(month) %>%
+  summarize(total_sales = sum(sales, na.rm = TRUE)) %>%
+  arrange(desc(total_sales))
+
+most_sales[1,]
+```
+
+**A: ** The highest number of sales takes place in June
+
+## 3. 
+What are the top three cities with the highest mean sales in dataset? What are the three cities with the lowest mean sales in the dataset?
+
+```{r}
+city_mean_high <- df %>%
+  group_by(city) %>%
+  summarize(mean_sales = mean(sales, na.rm=TRUE)) %>%
+  arrange(desc(mean_sales))
+
+city_mean_high[1:3, ]
+```
+```{r}
+
+city_mean_low <- df %>%
+  group_by(city) %>%
+  summarize(mean_sales = mean(sales, na.rm=TRUE)) %>%
+  arrange(mean_sales)
+
+city_mean_low[1:3, ]
+```
+
+**A:** \
+
+The three cities with the *highest* mean sales are Houston, Dallas, and Austin.\
+The three cities with the *lowest* mean sales are San Marcos, South Padre Island, Nacogdoches.
+
+## 4. 
+Plot sales and median sale price with a scatterplot. Is there a relationship? What is the correlation between them? (Note: the argument--use = "complete"--will remove NAs in the cor() function)
+```{r}
+#calculating the correlation
+correlation <- cor(x= df$median, y= df$sales, use="complete")
+
+#plotting the number of sales and the median sale price.
+df %>%
+  drop_na() %>%
+  as.data.frame() %>%
+  ggplot(aes(x= median, y= sales))+
+  scale_x_continuous (labels= scales ::comma)+
+  geom_point()+
+  geom_smooth(method='lm', formula= y~x)+
+  labs(
+    title = "The Possible Positive Correlation between the Median Sale Price and the Number of Sales",
+    subtitle = "The Result of fitting Linear Regression model between the Median Sale Price and the Number of Sales ",
+    x= "The Median Sale Price",
+    y= "The Number of Sales"
+  ) +
+  annotate("text", col= "Blue", x = 80000, y = 2300, family = "Times",
+             label = paste("Correlation = ", signif(correlation,3)))+
+  theme(
+    text = element_text(family = "Times")
+  )
+
+```
+
+```{r}
+#The code for correlation is in the top line of the previous cell
+correlation
+
+```
+
+**A:** 
+
+The relationship is hard to describe. It is true that the correlation to the linear regression model seems to imply that there is a positive linear relationship between the median price of sales and the number of sales. However, the number of sales varies a lot by cities and time even when it has the same median price. Therefore, it is difficult to deduce a relationship.
+
+The correlation between the two variables is 0.3449698.
+
+## 5. 
+Some analysts have theorized that as the median price increases, the number of sales increase. Fit a model to predict sales as a function of median sale price for the whole dataset. Describe the components of the model. What is sales referred to as? What is median sale price referred to as? What is the null hypothesis? What is the alternative hypothesis you are testing?
+
+**A:** 
+Since this hypothesis looks at two variables, I will use the bivariate regression to fit the model, or to find the line that minimizes the sum of the squared residuals. \
+
+```{r}
+model <- lm(sales ~ median, data = df)
+```
+
+
+*Components of the Model* \
+
+${Y_{i}={\beta_{0}+{\beta_{1}}{X_{i}}+{\epsilon_{n}}}}$
+
+$Y_{i}$ is the outcome (dependent)  variable. Here, it will be  the number of sales.
+
+$\beta_{0}$ is the intercept, a constant that shows the value when the independent variable is 0.
+
+$\beta_{1}$ is the coefficient of the variable that reflects the relationship between the dependent and the independent variable. 
+
+$X_{i}$ is the predictor (independent) variable. It will be the median price. 
+
+${\epsilon_{n}}$ refers to an error, which represents all the differences that any factor other than the independent variable creates to the dependent variables. \
+
+\
+*Hypothesis*\
+\ Null hypothesis: the median price and the number of sales is not related.\
+ Alternative hypothesis: When the median price increases, the number of sales increases.
+
+## 6. 
+Print the model summary and interpret the output. Can you reject the null hypothesis?
+```{r}
+options(scipen = 999)
+summary(model)
+```
+
+**A:** Usually, we reject the null hypothesis when the absolute value of $\frac{\hat{\beta_{1}}}{se({\hat{\beta_{1}}})}$ is greater than 2. (from the p.59 of the Powerpoint of week 6)
+
+```{r}
+#extract the beta hat1 value from the model
+slope_predicted <- summary(model)$coefficients[2, 1]
+#extract the standard error value of the beta hat1 value
+slope_standard_error <- summary(model)$coefficients[2, 2]
+
+#calculate the ratio
+slope_predicted/slope_standard_error
+```
+
+Based on the calculation above, the value is larger than 2, and therefore we can reject the null hypothesis.
+
+## 7. 
+Using the model summary, what is the coefficient? What does it represent? Is it statistically significant? What is the intercept? What is the (adjusted) R squared? What does it represent?
+```{r}
+#extract the coefficient 
+summary(model)$coefficient
+
+```
+
+The *coefficient* of the model is 0.01028198. When we express the line which minimizes the sum of the squared residuals of all data in a mathematical expression, it becomes ${\hat{Y_{i}}}= {\hat{\beta_{0}}}+{\hat{\beta_{1}}{X_{i}}}$ when there is only one variable in the model. The coefficient of the model is $\hat{\beta_{1}$ , which represents how much the dependent variable changes by the change of an independent variable. In other words, it is the slope of the line created by the model. The coefficient is statistically important because it represents the relationship between the dependent and independent variables.
+
+The *intercept* of the model is -765.08841413. Again, based on the mathematical expression of the line that minimizes the sum of the squared residuals, it refers to ${\hat{\beta_{0}}}$. This value represents the y intercept when we draw this line on a graph. It is usually not that significant because having 0 as an independent variable is very rare and usually not a topic of interest.
+
+The *R squared* value (${R^{2}}$, coefficient of determination) is one kind of tool to access the goodness of fit. The goodness of fit refers to "how well the model fits the data" (Bailey, 2021). ${R^{2}}$ is calculated ${1 - \frac{SumofSquared Residuals}{Sum of Squares Total}}$ To prevent from building a model that include too many unnecessary variables to increase the goodness of fit, we also use the *adjusted R squared* value, which is a R square value that penalizes based on the number of variables in the model. 
+
+
+## 8. 
+Explain the difference between observed values, fitted values, and residuals? How are residuals calculated? 
+
+**A:** \
+The *observed values* are the real values of the data that we are fitting the model into.
+The *fitted values* are the values on the regression line, predicted by the model.
+*Residuals* are the difference between the observed (real) and the fitted (expected) values.\
+You can calculate the residuals(${\epsilon_{i}}$) by ${\epsilon_{i}=Y_{i}-{\hat{Y}_{i}}}$
+
+
+## 9. 
+Extract the fitted values and residuals from your model and add them as columns to the original dataset (note: you may want to subset the original dataset and use only the variables you used in the model and then remove NAs to match the fitted values and residuals). Calculate the sum of squared residuals (with R). What are the sum of squared residuals, how are they calculated, and why are they useful?
+```{r}
+# Extract the fitted values and residuals from model and add to the dataset
+model_df <- df %>%
+  select("median","sales") %>%  
+  drop_na() %>%
+  as.data.frame() %>%
+  mutate(fitted_values = model$fitted.values) %>%
+  mutate(residual = model$residuals) 
+
+head(model_df)
+  
+```
+```{r}
+# Calculate the sum of squared residuals
+ssr <- model_df %>%
+  mutate(squared_residuals = residual^2) %>%
+  summarize(sum_of_squared_residuals= sum(squared_residuals))
+
+ssr
+```
+**A:**
+The Sum of Squared Residuals is $\sum_{i = 1}^{N} ({Y_{i}-{\hat{\beta}_0}-{\hat{\beta}_1}{X_{i}})^2}$, meaning that it is the sum of the squared difference between the actual observed value and the fitted value. Since it converts all residuals values to positive and add them together, it can estimate how well the model fit to the dataset when compared to other possible lines. In fact, if one is applying an linear regression, the line produced through the model should have the least possible value of the sum of squared residuals.
+
+## 10. 
+Explain whether median sales price is endogenous or exogenous. What do the terms means? What are the implications of an endogenous predictor?
+
+**A:**
+*Endogenous* variable is that also have correlation to the error terms. On the other hand, an *exogenous* variable does not change depending on other factors counted in the error terms.\
+
+The median sales price is likely to be endogenous. A median sales price can be affected by another factor that also influences the independent variable (number of sales), such as how successful the housing market is in a specific time period (date), the regional difference of the housing market (city), or the population density of a region.  
+
+An endogenous predictor implies that the model may not capturing the real effect of the independent variable (predictor). It could be that something in the error term is influencing the result in addition to the independent variable.
+
+
+## 11. 
+What other factors (either in the dataset or data you could collect) may help explain sales that could be added to the model?
+
+**A:**  \
+* Inflation rate: If the inflation is high (which means that the value of currency is low), people will be more willing to purchase good instead of keeping their money in the bank, increasing the number of housing sales (and also potentially affecting the the median price of sales). \
+* The amount of mortgage that the banks give out: If the bank gives out mortgage more easily, the consumers' capacity to  afford a house will also increase. \
+* The number of real estate agency in the region : If there are more agents actively working to foster real estate transactions, the number of sales may increase. 
+
+## 12.  
+Use the stargazer. R package to produce a "beautiful" regression table of your model (instead of the standard output from R's summary() function)
+```{r, results= "asis"}
+
+library(stargazer)
+stargazer(model, 
+          title = "Linear Regression Result between Median Price and the Number of Sales",
+          align = TRUE,
+          type = "html")
+
+```
+
+
+
+## Reference
+
+Bailey, M. A. (2021). Real stats : using econometrics for political science and public policy (Second edition.). Oxford University Press.
+
+

@@ -1,0 +1,599 @@
+---
+title: "Assignment_3"
+author: "MinAh Kim"
+date: "2022-09-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1
+Read in the pew_covid_internet.csv  Download pew_covid_internet.csv dataset.
+
+```{r}
+df <- read.csv("pew_covid_internet.csv") 
+```
+
+
+## 2
+How many rows and columns are there in the dataset?
+
+```{r}
+dim(df)
+```
+
+**A**: There are 1502 rows and 89 columns 
+
+## 3
+Using the coding information and questionnaire (pew_covid_internet_questions) , explain how each of the following variables are coded and what each measures: income, educ2, par, gender, age, coviddisa, coviddisb, coviddisc, coviddisd, coviddise, state
+
+**A**:
+
+**income**: It shows the range that the respondent's total family income is included (before tax) \
+  1 is less than $10,000 \
+  2 is $10,000 - under $20,000 \
+  3 is $20,000 - under $30,000 \ 
+  4 is $30,000 - under $40,000 \
+  5 is $40,000 - under $50,000 \ 
+  6 is $50,000 - under $75,000 \ 
+  7 is $75,000 - under $100,000 \ 
+  8 is $100,000 - under $150,000 \
+  9 is $150,000 or more \
+  98 means "Don't know" (It says "VOL.", which I assume that it's recorded only when voluntarily responded.) \
+  99 means "Refused" (Also "VOL.") \
+
+
+**educ2**: This records the highest level of completed degree or school of the respondent \
+  1 is for less than high school (G1-8, no formal schooling) \
+  2 is for not completing high school (G9-11 or G12 without diploma) \
+  3 is for High school graduates or those with GED certificate \
+  4 is for some college (including community college) without degree \
+  5 is for 2-year associate degree from college/university \
+  6 is for 4-year college/university/Bachelor's degree \
+  7 is for not completing postgraduate/professional school \
+  8 is for postgraduate or professional degrees (MA, MS, Ph.D, etc.) \
+  98 is "Don't know" \
+  99 is "refused" \
+
+**par**: This is an answer to the question if the respondent is a parent or a guardian of anyone under 18. \
+  1 means yes \
+  2 means no \
+  8 means "Don't know" ("VOL." appeared again) \
+  9 means refused to answer ("VOL.") \
+
+**gender**: This is an answer to the question asking the respondent's gender. \
+  1 refers to man \
+  2 refers to woman \
+  3 refers to "In some other way" \
+  8 refers to "Don't know" \
+  9 refers to cases that the respondents refused to answer.\
+
+**age**: It records the exact age of the respondent until 96. \
+  97 refers to 97 or older  \
+  98 refers to "Don't know" \
+  99 refers to "Refused" answer\  
+  \
+
+**conviddisa**: It asks in what degree that people without high speed internet have a disadvantage in keeping up with the latest information about covid. \
+  1 means that the respondent thinks those people are at major disadvantage. \
+  2 means that the respondent thinks those people are at minor disadvantage. \
+  3 means that the respondent thinks those people do not have disadvantage. \
+  8 is for the respondent who said they don't know (VOL.) \
+  9 is for the respondent who refuse to answer (VOL.) \
+
+**coviddisb**: It asks in what degree that people without high speed internet have a disadvantage in staying in contact with friends and family. \
+  1 means that the respondent thinks those people are at major disadvantage. \
+  2 means that the respondent thinks those people are at minor disadvantage. \
+  3 means that the respondent thinks those people do not have disadvantage. \
+  8 is for the respondent who said they don't know (VOL.) \
+  9 is for the respondent who refuse to answer (VOL.) \
+  
+**coviddisc**: It asks in what degree that people without high speed internet have a disadvantage in job search. \
+  1 means that the respondent thinks those people are at major disadvantage. \
+  2 means that the respondent thinks those people are at minor disadvantage. \
+  3 means that the respondent thinks those people do not have disadvantage. \
+  8 is for the respondent who said they don't know (VOL.) \
+  9 is for the respondent who refuse to answer (VOL.) \
+
+**coviddisd**: It asks in what degree that people without high speed internet have a disadvantage in getting schoolwork done. \
+  1 means that the respondent thinks those people are at major disadvantage. \
+  2 means that the respondent thinks those people are at minor disadvantage. \
+  3 means that the respondent thinks those people do not have disadvantage. \
+  8 is for the respondent who said they don't know (VOL.) \
+  9 is for the respondent who refuse to answer (VOL.) \
+  
+**coviddise**: It asks in what degree that people without high speed internet have a disadvantage in connecting with doctors or other medical professionals.\
+  1 means that the respondent thinks those people are at major disadvantage.\ 
+  2 means that the respondent thinks those people are at minor disadvantage. \
+  3 means that the respondent thinks those people do not have disadvantage. \
+  8 is for the respondent who said they don't know (VOL.) \
+  9 is for the respondent who refuse to answer (VOL.) \
+  
+**state** : Although it does not have any explicit question that asks for the state, it seems to record the state of the respondent in FIPS code, a numerical value system used to represent the states of the U.S.. \
+
+
+## 4
+Take the raw pew dataset you just read in and do some preprocessing to create a new dataframe called pew_working. Specifically, use mutate(), pipes, conditionals, and select() to create new recoded and clean columns that
+
+  - replace any "Don't know" or "Refused" answers with NA
+  - create a binary variable called "ba" that is 1 if the respondent has a college degree or higher and 0 otherwise
+  - create a binary variable called "female" that is 1 if the respondent identified as a female or 0 otherwise
+  - create a binary variable called "parent" that is 1 is the respondent indicated they had a child under 18 and 0 otherwise
+  - create a numeric variable called "age" that is NA if the value is greater than 98
+  - create 5 binary variables (one for each item between coviddisa through coviddise) that each take the value of 1 if the respondent believes that not having high speed internet puts people at a "major disadvantage" for the domain of life asked in the item, and 0 otherwise
+  - select the following variables to keep in the new dataset: income, ba, parent, female, age, state, and the 5 binary variables about internet access
+  
+```{r}
+library(dplyr)
+
+#replacing Don't Know or Refused with NA
+pew_working <- df %>%
+  mutate(income = ifelse(income > 9, NA, income))  %>%
+  mutate(educ2 = ifelse(educ2 %in% c(98,99) , NA, educ2)) %>%
+  mutate(par = ifelse(par %in% c(8,9) , NA, par)) %>%
+  mutate(gender = ifelse(gender %in% c(8,9), NA, gender)) %>%
+  mutate(age = ifelse(age == 99, NA, age)) %>%
+  mutate(coviddisa = ifelse(coviddisa %in% c(8, 9), NA, coviddisa)) %>%
+  mutate(coviddisb = ifelse(coviddisb %in% c(8,9), NA, coviddisb)) %>%
+  mutate(coviddisc = ifelse(coviddisc %in% c(8,9), NA, coviddisc)) %>%
+  mutate(coviddisd = ifelse(coviddisd %in% c(8,9), NA, coviddisd)) %>%
+  mutate(coviddise = ifelse(coviddise %in% c(8,9), NA, coviddise)) %>%
+
+#create a binary variable called "ba" that is 1 if the respondent has a college degree or higher and 0 otherwise
+#however, I did not change NA to 0 for all binary variables used in question 4 and 5
+  mutate(ba = ifelse((educ2 > 5), 1, 0)) %>%
+  
+#create a binary variable called "female" that is 1 if the respondent identified as a female or 0 otherwise
+  mutate(female = ifelse((gender == 2), 1, 0)) %>%
+
+#create a binary variable called "parent" that is 1 is the respondent indicated they had a child under 18 and 0 otherwise
+  mutate(parent = ifelse((par == 1), 1, 0)) %>%
+
+#create a numeric variable called "age" that is NA if the value is greater than 98
+  mutate(age = ifelse(age>98, NA, age)) %>%
+
+#create 5 binary variables (one for each item between coviddisa through coviddise) that each take the value of 1 if the respondent believes that not having high speed internet puts people at a "major disadvantage" for the domain of life asked in the item, and 0 otherwise
+  mutate(b_coviddisa = ifelse((coviddisa == 1), 1,0)) %>%
+  mutate(b_coviddisb = ifelse((coviddisb == 1), 1,0)) %>%
+  mutate(b_coviddisc = ifelse((coviddisc == 1), 1,0)) %>%
+  mutate(b_coviddisd = ifelse((coviddisd == 1), 1,0)) %>%
+  mutate(b_coviddise = ifelse((coviddise == 1), 1,0)) 
+#  select(income, ba, parent, female, age, state, b_coviddisa, b_coviddisb, b_coviddisc, b_coviddisd, b_coviddise)
+
+head(pew_working, n=10)
+
+
+
+```
+
+## 5
+Define a custom function called "clean_internet" to more efficiently clean the coviddis questions. The function should take one input, convert values greater than 3 to NA and result in a binary variable that takes the value of 1 if the respondent indicates "major disadvantage".  Use the function to create pew_working2. Verify that the pew_working and pew_working2 are identical. Once verified, use either one for the rest of the assignment.
+```{r}
+
+#Function that does the same wrangling process from number 4
+clean_internet <- function (column){
+  new_column = ifelse(column > 3, NA, column)
+  new_column = ifelse((new_column ==1), 1, 0)
+  new_column
+}
+
+#Applying function and creating pew_working2
+pew_working2 <- df %>%
+  mutate(b_coviddisa = clean_internet(coviddisa)) %>%
+  mutate(b_coviddisb = clean_internet(coviddisb)) %>%
+  mutate(b_coviddisc = clean_internet(coviddisc)) %>%
+  mutate(b_coviddisd = clean_internet(coviddisd)) %>%
+  mutate(b_coviddise = clean_internet(coviddise))
+
+#subsetting the two datasets for comparison
+compare1<- select(pew_working, b_coviddisa, b_coviddisb, b_coviddisc, b_coviddisd, b_coviddise)
+compare2<- select(pew_working2, b_coviddisa, b_coviddisb, b_coviddisc, b_coviddisd, b_coviddise)
+
+#Using all_equal function from dplyr to compare the true.
+#It returns true when all the two dataframes are identical.
+print(all_equal(compare1, compare2))
+
+
+
+```
+
+
+## 6 
+How many respondents identified as female? What proportion of respondents have a BA degree or more? What proportion of respondents are parents?
+```{r}
+
+
+proportion_pop <- pew_working %>%
+  summarize(female_res= sum(female, na.rm=TRUE), 
+            ba_proportion= mean(ba, na.rm=TRUE), 
+            parent_proportion= mean(parent, na.rm=TRUE))
+print(proportion_pop)
+
+```
+
+**A:** 
+  - 628 of the respondents identified as female.  
+  - Around 47.7% of the respondents identified to obtain an equivalent of Bachelor's degree or above
+  - Around 23.6% of the respondents identified to be a parent or a guardian of children under 18.
+
+## 7
+What proportion of respondents believe that people who do not have high speed internet at home are at a major disadvantage when it comes to looking for jobs? What proportion of respondents believe that people who do not have high speed internet at home are at a major disadvantage when it comes to keeping up with the latest information about COVID-19? In a short paragraph, explain why you think more people think not having high speed internet negatively affects people's ability to look for jobs than it does people's ability to keep up with the latest information about COVID-19.
+```{r}
+proportion_covid <- pew_working %>%
+  summarize(a_proportion = mean(b_coviddisa, na.rm=TRUE), 
+            b_proportion = mean(b_coviddisb, na.rm=TRUE), 
+            c_proportion = mean(b_coviddisc, na.rm=TRUE),
+            d_proportion = mean(b_coviddisd, na.rm=TRUE),
+            e_proportion = mean(b_coviddise, na.rm=TRUE)
+            )
+print(proportion_covid)
+
+```
+
+**A:** 
+  - The proportion of people that think people without high speed internet have a major disadvantage in job searching is around 68.9%.
+  - The proportion of people that think people without high speed internet have a major disadvantage in connecting with doctors or other medical professionals is around 51.3%
+  
+  We do not have sufficient information to deduce why people think finding a job is difficult than getting the latest information about COVID. However, I suspect that this result reflects how much the contemporary job searching system function around internet resources (such as LinkedIn, Glassdoor, etc.) On the other hand, I can easily think of mediums that you can get updated information on COVID, such as newspapers, neighbors, and radio. Also, finding job became generally difficult during COVID as unemployment rises. Therefore, people may feel that those without high speed internet even has lower chances of getting job than before.
+
+## 8
+Treating income as an ordered numeric variable, group by income and calculate the the proportion who say major disadvantage for each internet item for each income level. Make sure to filter observations with NA in the income variable and remove NAs when computing the mean. Is there a relationship between income and respondents' views on the impact of no high speed internet at home? Can you identify any trends or noteworthy patterns?
+```{r}
+income_proportion <- pew_working %>%
+  filter(!is.na(income)) %>%
+  group_by(income) %>%
+  summarise(a_proportion = mean(b_coviddisa, na.rm=TRUE), 
+            b_proportion = mean(b_coviddisb, na.rm=TRUE), 
+            c_proportion = mean(b_coviddisc, na.rm=TRUE),
+            d_proportion = mean(b_coviddisd, na.rm=TRUE),
+            e_proportion = mean(b_coviddise, na.rm=TRUE)
+            )
+
+income_proportion
+
+```
+
+**A:** The proportion tends to rise slightly when the income level increases. In general, the people with the highest income level are around 10% to 20% more likely to answer that major disadvantage exists compared to those in the lowest level. However, there is an exception like question b, which asks about staying in contact with friends and family. Here, the answer seems to fluctuate depending on the income level. The proportions of answers seem to converge in question e too, which asks about connecting with medical resources
+
+## 9
+Treating income as an ordered numeric variable, group by income and calculate the the proportion who say major disadvantage for each internet item for each income level. Make sure to filter observations with NA in the income variable and remove NAs when computing the mean. Use the reshaped dataframe to plot the results to show, in the clearest way possible, the extent to which people from different income levels believe not having high speed internet at home puts individuals at a major disadvantage. The plot should have a clear, informative title, a caption with the number of observations, and meaningful axis labels. Explain the results of the plot in a short paragraph and any noteworthy patterns.
+```{r}
+library(ggplot2)
+library(tidyr)
+
+income_proportion <- pew_working %>%
+  filter(!is.na(income)) %>%
+  group_by(income) %>%
+  summarise(a_proportion = mean(b_coviddisa, na.rm=TRUE), 
+            b_proportion = mean(b_coviddisb, na.rm=TRUE), 
+            c_proportion = mean(b_coviddisc, na.rm=TRUE),
+            d_proportion = mean(b_coviddisd, na.rm=TRUE),
+            e_proportion = mean(b_coviddise, na.rm=TRUE)
+            )
+
+
+gathercols <- c("a_proportion", "b_proportion", "c_proportion", "d_proportion","e_proportion")
+
+#I create a line graph to see the difference between the proportions based on the income level.
+income_proportion %>%
+  gather("answer", "proportion", gathercols) %>%
+  mutate(answer = ifelse(answer == "a_proportion","COVID Info", answer)) %>%
+  mutate(answer = ifelse(answer == "b_proportion","Social Contact", answer)) %>%
+  mutate(answer = ifelse(answer == "c_proportion","Job Search", answer)) %>%
+  mutate(answer = ifelse(answer == "d_proportion","School Work", answer)) %>%
+  mutate(answer = ifelse(answer == "e_proportion","Medical Help", answer)) %>%
+  ggplot(aes(x=as.factor(income), y = proportion, group = answer))+
+    geom_line(aes(colour = answer))+
+    geom_point()+
+    ylim(0,1)+
+    labs(
+      title = "Constant Trend in Answers that No Access of Highspeed Internet a Major Disadvantages",
+      subtitle = "Analyzing the proportion that responsed that it is a major disadvantage by Income Level",
+      x= "Income Level",
+      y= "Proportion of respondents that answered \n that it is a major disadvantage",
+      colour = "Areas",
+      caption = paste("The number of observations (including NAs): ", nrow(pew_working))
+    ) +
+    theme(
+      text = element_text(family = "Times"),
+      plot.title = element_text(size = 12, hjust = 0.5, family = "Times"),
+      plot.subtitle = element_text(hjust = 0.5, family = "Times")
+    )
+  
+
+
+```
+
+**A:**
+Mostly, the proportions of the answers tend to not diverge significantly across income levels. The question that has the largest discrepancy among income levels is the questions on schooling. People with high income level tends to believe that people without high internet access have major disadvantages on completing school work in comparison with those with low income level. The proportion of those believing that limited access to high speed internet significantly deter the job search also seems to higher in high income individuals than the low income population. Interestingly, the mid-income population has the lowest proportion of people who think that not having high speed internet become a major disadvantage when getting latest information on COVID.
+
+## 10  
+Consider the other variables in the dataset and any noteworthy trends across the 5 internet items. Do the results above change notably when you group by other variables such as parent or female?
+
+```{r}
+library(ggplot2)
+library(tidyr)
+library(forcats)
+
+female_proportion <- pew_working %>%
+  filter(!is.na(female)) %>%
+  group_by(female) %>%
+  summarise(a_proportion = mean(b_coviddisa, na.rm=TRUE), 
+            b_proportion = mean(b_coviddisb, na.rm=TRUE), 
+            c_proportion = mean(b_coviddisc, na.rm=TRUE),
+            d_proportion = mean(b_coviddisd, na.rm=TRUE),
+            e_proportion = mean(b_coviddise, na.rm=TRUE)
+            ) %>%
+  mutate(gender = ifelse(female == 1 , "Female", "Any Other Gender Identities"))
+
+
+gathercols <- c("a_proportion", "b_proportion", "c_proportion", "d_proportion","e_proportion")
+
+female_proportion %>%
+  
+  gather("answer", "proportion", gathercols) %>%
+  mutate(answer = ifelse(answer == "a_proportion","COVID Info", answer)) %>%
+  mutate(answer = ifelse(answer == "b_proportion","Social Contact", answer)) %>%
+  mutate(answer = ifelse(answer == "c_proportion","Job Search", answer)) %>%
+  mutate(answer = ifelse(answer == "d_proportion","School Work", answer)) %>%
+  mutate(answer = ifelse(answer == "e_proportion","Medical Help", answer)) %>%
+  ggplot(aes(x=answer, y = proportion, fill = reorder(gender, desc(female))))+
+    geom_bar(stat='identity',position = "dodge2")+
+    ylim(0,1)+
+    labs(
+      title = "Females Think that No Access of Highspeed Internet is a Major Disadvantage",
+      subtitle = "Comparing the female proportion that responsed that it is a major disadvantage to other groups",
+      x= "Areas",
+      y= "Proportion of respondents that answered \n that it is a major disadvantage",
+      fill = "Gender",
+      caption = paste("The number of observations (including NAs): ", nrow(pew_working))
+    )+
+    theme(
+      text = element_text(family = "Times"),
+      plot.title = element_text(size = 11, hjust = 0.5, family = "Times"),
+      plot.subtitle = element_text(size = 9, hjust = 0.5, family = "Times")
+    )
+
+
+```
+
+**A:** Females tend to answer that the major disadvantages exist in all areas compared to those with different gender identities. 
+
+
+```{r}
+library(ggplot2)
+library(tidyr)
+library(forcats)
+
+parent_proportion <- pew_working %>%
+  filter(!is.na(parent)) %>%
+  group_by(parent) %>%
+  summarise(a_proportion = mean(b_coviddisa, na.rm=TRUE), 
+            b_proportion = mean(b_coviddisb, na.rm=TRUE), 
+            c_proportion = mean(b_coviddisc, na.rm=TRUE),
+            d_proportion = mean(b_coviddisd, na.rm=TRUE),
+            e_proportion = mean(b_coviddise, na.rm=TRUE)
+            ) %>%
+  mutate(par = ifelse(parent == 1 , "Parent/Guardian of Under 18", "Others"))
+
+
+gathercols <- c("a_proportion", "b_proportion", "c_proportion", "d_proportion","e_proportion")
+
+parent_proportion %>%
+  gather("answer", "proportion", gathercols) %>%
+  mutate(answer = ifelse(answer == "a_proportion","COVID Info", answer)) %>%
+  mutate(answer = ifelse(answer == "b_proportion","Social Contact", answer)) %>%
+  mutate(answer = ifelse(answer == "c_proportion","Job Search", answer)) %>%
+  mutate(answer = ifelse(answer == "d_proportion","School Work", answer)) %>%
+  mutate(answer = ifelse(answer == "e_proportion","Medical Help", answer)) %>%
+  ggplot(aes(x=answer, y = proportion, fill = reorder(par, desc(parent))))+
+    geom_bar(stat='identity',position = "dodge2")+
+    ylim(0,1)+
+    labs(
+      title = "Depending on areas, Parents Think that No Access of Highspeed Internet is a Major Disadvantage",
+      subtitle = "Comparing the proportion of parents and guardian of children under 18 that responsed that\n it is a major disadvantage to other people",
+      x= "Areas",
+      y= "Proportion of respondents that answered \n that it is a major disadvantage",
+      fill = "Parenthood",
+      caption = paste("The number of observations (including NAs): ", nrow(pew_working))
+    )+
+    theme(
+      text = element_text(family = "Times"),
+      plot.title = element_text(size = 10, hjust = 0.5, family = "Times"),
+      plot.subtitle = element_text(size =8, hjust = 0.5, family = "Times")
+    )
+
+```
+
+**A:** Compared to the graph based on gender, this graph does not show a significant difference between the parent/guardian group and the non-parent/guardian group. For instance, they show almost no difference in the question that asks about connecting with doctors or other medical professional or the question about connecting with family and friends.
+
+Do the results above change notable when you group by both income and parent or ba and female or income and female? Summarize any additional insights using clean and clear plots and 1-2 paragraphs explaining the results and potential explanations for the results.
+```{r}
+library(ggplot2)
+library(tidyr)
+library(forcats)
+
+income_parent_proportion <- pew_working %>%
+  filter(!is.na(parent)) %>%
+  filter(!is.na(income)) %>%
+  group_by(parent, income) %>%
+  summarise(a_proportion = mean(b_coviddisa, na.rm=TRUE), 
+            b_proportion = mean(b_coviddisb, na.rm=TRUE), 
+            c_proportion = mean(b_coviddisc, na.rm=TRUE),
+            d_proportion = mean(b_coviddisd, na.rm=TRUE),
+            e_proportion = mean(b_coviddise, na.rm=TRUE)
+            ) %>%
+  mutate(par = ifelse(parent == 1 , "Parent/Guardian of Under 18", "Others"))
+
+
+gathercols <- c("a_proportion", "b_proportion", "c_proportion", "d_proportion","e_proportion")
+
+income_parent_proportion %>%
+  
+  gather("answer", "proportion", gathercols) %>%
+  mutate(answer = ifelse(answer == "a_proportion","COVID Info", answer)) %>%
+  mutate(answer = ifelse(answer == "b_proportion","Social Contact", answer)) %>%
+  mutate(answer = ifelse(answer == "c_proportion","Job Search", answer)) %>%
+  mutate(answer = ifelse(answer == "d_proportion","School Work", answer)) %>%
+  mutate(answer = ifelse(answer == "e_proportion","Medical Help", answer)) %>%
+  ggplot(aes(x=answer, y = proportion, fill = reorder(par, desc(parent))))+
+  geom_bar(stat='identity',position = "dodge2")+
+    ylim(0,1)+
+    labs(
+      title = "Parenthood & Perceived Disadvantage in Internet Accessibility \nduring COVID (Correcting Income) ",
+      subtitle = "Comparing the parents/guardian's proportion that responsed that \nit is a major disadvantage to others",
+      x= "Areas",
+      y= "Proportion of respondents that answered \n that it is a major disadvantage",
+      fill = "Parenthood",
+      caption = paste("The number of observations (including NAs): ", nrow(pew_working))
+    )+
+  theme(
+    text = element_text(family = "Times"),
+    axis.text.x = element_text(angle = 90, family = "Times"),
+    plot.title = element_text(size = 11, hjust = 0.5, family = "Times"),
+    plot.subtitle = element_text(size = 9, hjust = 0.5, family = "Times")
+  )+
+  facet_wrap(~income)
+```
+
+```{r}
+library(ggplot2)
+library(tidyr)
+library(forcats)
+
+ba_female_proportion <- pew_working %>%
+  filter(!is.na(female)) %>%
+  filter(!is.na(ba)) %>%
+  group_by(female, ba) %>%
+  summarise(a_proportion = mean(b_coviddisa, na.rm=TRUE), 
+            b_proportion = mean(b_coviddisb, na.rm=TRUE), 
+            c_proportion = mean(b_coviddisc, na.rm=TRUE),
+            d_proportion = mean(b_coviddisd, na.rm=TRUE),
+            e_proportion = mean(b_coviddise, na.rm=TRUE)
+            ) %>%
+  mutate(gender = ifelse(female == 1 , "Female", "Any Other Gender Identities")) %>%
+  mutate(degree = ifelse(ba == 1 , "Bachelor's Degree/\n4Yr College or Above", "Below 4Yr College"))  
+
+
+gathercols <- c("a_proportion", "b_proportion", "c_proportion", "d_proportion","e_proportion")
+
+ba_female_proportion %>%
+  
+  gather("answer", "proportion", gathercols) %>%
+  mutate(answer = ifelse(answer == "a_proportion","COVID Info", answer)) %>%
+  mutate(answer = ifelse(answer == "b_proportion","Social Contact", answer)) %>%
+  mutate(answer = ifelse(answer == "c_proportion","Job Search", answer)) %>%
+  mutate(answer = ifelse(answer == "d_proportion","School Work", answer)) %>%
+  mutate(answer = ifelse(answer == "e_proportion","Medical Help", answer)) %>%
+  ggplot(aes(x=answer, y = proportion, fill = reorder(gender, desc(female))))+
+    geom_bar(stat='identity',position = "dodge2")+
+    ylim(0,1)+
+    labs(
+      title = "Female Identity & Understanding internet accessibility in COVID \n (Correcting Education)",
+      subtitle = "Comparing the education level that responsed that it is a major disadvantage to others",
+      x= "Areas",
+      y= "Proportion of respondents that answered \n that it is a major disadvantage",
+      fill = "Gender",
+      caption = paste("The number of observations (including NAs): ", nrow(pew_working))
+    )+
+  theme(
+    text = element_text(family = "Times"),
+    axis.text.x = element_text(angle = 90, family = "Times"),
+    plot.title = element_text(size = 12, hjust = 0.5, family = "Times"),
+    plot.subtitle = element_text(hjust = 0.5, family = "Times")    
+  )+
+  facet_wrap(~degree)
+```
+
+
+```{r}
+library(ggplot2)
+library(tidyr)
+library(forcats)
+
+income_female_proportion <- pew_working %>%
+  filter(!is.na(female)) %>%
+  filter(!is.na(income)) %>%
+  group_by(female, income) %>%
+  summarise(a_proportion = mean(b_coviddisa, na.rm=TRUE), 
+            b_proportion = mean(b_coviddisb, na.rm=TRUE), 
+            c_proportion = mean(b_coviddisc, na.rm=TRUE),
+            d_proportion = mean(b_coviddisd, na.rm=TRUE),
+            e_proportion = mean(b_coviddise, na.rm=TRUE)
+            ) %>%
+  mutate(gender = ifelse(female == 1 , "Female", "Any Other Gender Identities"))
+
+
+gathercols <- c("a_proportion", "b_proportion", "c_proportion", "d_proportion","e_proportion")
+
+income_female_proportion %>%
+  
+  gather("answer", "proportion", gathercols) %>%
+  mutate(answer = ifelse(answer == "a_proportion","COVID Info", answer)) %>%
+  mutate(answer = ifelse(answer == "b_proportion","Social Contact", answer)) %>%
+  mutate(answer = ifelse(answer == "c_proportion","Job Search", answer)) %>%
+  mutate(answer = ifelse(answer == "d_proportion","School Work", answer)) %>%
+  mutate(answer = ifelse(answer == "e_proportion","Medical Help", answer)) %>%
+  ggplot(aes(x=answer, y = proportion, fill = reorder(gender, desc(female))))+
+    geom_bar(stat='identity',position = "dodge2")+
+    ylim(0,1)+
+    labs(
+      title = "Female Identity & Understanding internet accessibility in COVID \n (Correcting Income) ",
+      subtitle = "Comparing the female proportion that responsed that it is a major disadvantage to others",
+      x= "Areas",
+      y= "Proportion of respondents that answered \n that it is a major disadvantage",
+      fill = "Gender",
+      caption = paste("The number of observations (including NAs): ", nrow(pew_working))
+    )+
+  theme(
+    text = element_text(family = "Times"),
+    axis.text.x = element_text(angle = 90, family = "Times"),
+    plot.title = element_text(size = 12, hjust = 0.5, family = "Times"),
+    plot.subtitle = element_text(hjust = 0.5, family = "Times")
+  )+
+  facet_wrap(~income)
+```
+
+**A:** The proportion difference by gender (female vs all other idenities) shows the greatest when you subdivide the data into education level. It seems like females tend to believe that not having internet access is a major disadvantage in comparison to their peers in the same education level. This trend, however, does not follow when you compare women with other gender identifying people in the same parental status or income. It is true that females tend to believe in the existence of major disadvantage than other groups, but the difference is often not significant as much as when I adjust education level. In fact, there are moment when the trend reverses. (e.g. Income level 2, question on school work) \
+\
+  In the general graph, there are more proportion of parents who think that not having internet is a major disadvantage than those who are not parents/guardians of children. Yet, this trend does not persist when we start including income as a variable. In certain income group (such as group 6), the parents/guardians do not believe that the lack of internet is a major disadvantage even in completing school work, the question that usually shows the biggest difference. Thus, we need  further investigation on why income affects the trend.
+
+## 11 
+Read in the State FIPS codes.  Download State FIPS codes dataset from the US Census and use it to join your pew_working dataframe with the FIPS codes data to get state names for all respondents in your dataframe. (Note: the Pew dataset has the state FIPS code for each respondent but not the state name. See also: What is the FIPS Code? (Links to an external site.)). After joining the datasets, create a plot that plots the number of respondents in the dataset from each state. The plot should be ordered in descending order. You should also flip the coordinates so the state names are easier to read. Which state has the most respondents in the dataset?
+
+```{r}
+library(ggplot2)
+library(forcats)
+
+#read the State FIPS codes
+df2 <-read.csv("state_fips.csv")
+head(df2, 10)
+
+#Left merge two dataframe using the State FIPS code
+df_with_state <- merge(df, df2, by.x = "state", by.y = "STATE")
+
+#Create a graph based on the number of respondents in each state
+df_with_state %>%
+  group_by(STATE_NAME) %>%
+  summarise(num = n()) %>%
+  ggplot(aes(x= reorder(STATE_NAME, num), y = num))+
+  geom_bar(stat='identity')+
+  labs(
+    title = "Number of Respondents by States",
+    y = "Number of Respondents",
+    x = "States"
+  )+
+  theme(
+    text = element_text(family = "Times"),
+    axis.text = element_text(size = 6.5, family = "Times"),
+    plot.title = element_text(size = 12, hjust = 0.5, family = "Times"),
+    plot.subtitle = element_text(hjust = 0.5, family = "Times")
+  )+
+  coord_flip()
+  
+```
+
+**A:** California has the most respondents.
+

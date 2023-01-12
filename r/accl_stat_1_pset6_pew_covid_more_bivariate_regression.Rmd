@@ -1,0 +1,397 @@
+---
+title: "Assignment 6"
+author: "MinAh Kim"
+date: "2022-11-11"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1
+Read in the pew_covid_internet.csv Download pew_covid_internet.csv data.
+```{r}
+library(dplyr)
+library(ggplot2)
+df <- read.csv("pew_covid_internet.csv")
+```
+
+
+## 2
+Clean the data as you did in #5 in Assignment 3
+```{r}
+#I copied from the previous submission of my assignment to lessen confusion.
+#Function that does the same wrangling process from number 4
+clean_internet <- function (column){
+  new_column = ifelse(column > 3, NA, column)
+  new_column = ifelse((new_column ==1), 1, 0)
+  new_column
+}
+
+#Applying function and creating pew_working
+pew_working <- df %>%
+  mutate(b_coviddisa = clean_internet(coviddisa)) %>%
+  mutate(b_coviddisb = clean_internet(coviddisb)) %>%
+  mutate(b_coviddisc = clean_internet(coviddisc)) %>%
+  mutate(b_coviddisd = clean_internet(coviddisd)) %>%
+  mutate(b_coviddise = clean_internet(coviddise))
+
+```
+
+## 3
+Fit 5 logistic regression models to the five questions about high speed internet access to predict views that not having internet puts people at a disadvantage regarding access to information, family, jobs, school, and medical information. Include income, college degree, parent, sex, and age as predictor variables in the model. Print the results in a single table using the stargazer package.
+```{r}
+#Include income, college degree, parent, sex, and age as predictor variables in the model
+
+#I use the gender as the column instead of sex. Both the information on gender and sex is self-reported, but they did not distinguish the notion of sex vs gender clearly when asking the question. They recorded sex by asking someone who is either male or female in the family to answer the survey. For gender, they directly ask if they identify as male or female or any other way. Since these way of questioning do not distinguish the technical difference between gender and sex, I choose to use gender, which has richer and more accurate data. 
+
+#I am checking the unique or NA values in the variables to check the validity of data
+print(paste("The number of NA's in income is ", sum(is.na(pew_working$income))," and the unique values are"))
+unique(pew_working$income)
+
+print(paste("The number of NA's in parenthood is ", sum(is.na(pew_working$par)), ", and the unique values are"))
+unique(pew_working$par)
+
+print(paste("The number of NA's in gender is ", sum(is.na(pew_working$gender)), ", and the unique values are")) 
+unique(pew_working$gender)
+
+print(paste("The number of NA's in age is ", sum(is.na(pew_working$age)), ", and the unique values are")) 
+unique(pew_working$age)
+
+#I concluded to leave income as it is since it is an ordered categorical variable. I believe that the values would not distract the result
+#However, I will be changing the par (parenthood) variable to 0 and 1 since it is an unordered categorical variable. Not being a parent has no reason to have higher numerical value. 
+#I am also dropping response 9, as it refers to "refuse to answer", and there is no reason to assign high numerical value to it. It is also only 1% of the whole rows (calculated by sum(pew_working$par==9)/length(pew_working$par)).
+pew_clean <- pew_working[pew_working$par!=9,]
+dim(pew_clean)
+pew_clean <- pew_clean %>%
+  mutate(parent = ifelse(par ==1, 1, 0)) 
+
+#I am cleaning the gender section as it is also another unordered categorical variable.
+#I am also excluding the value 9, which is when the respondent refuse to answer, and value 8, "Don't Know". It is 0.8% of the whole rows(calculated by sum((pew_working$gender==9))/length(pew_working$gender))
+#I originally wanted to separate 8 as another dummy variable because I believe that someone who is still navigating their own gender identity is another status worthwhile to notice. However, when I did the logistic regression, it returns NA values, possibly because of the lack of samples. Therefore, I decided to drop it.
+pew_clean <- pew_clean[!(pew_clean$gender %in% c(8,9)),]
+dim(pew_clean)
+
+#Meanwhile, I am creating separate columns that will become a dunny variable for different gender identity.
+pew_clean <- pew_clean %>%
+  #female will be the column for female identifying people
+  mutate(female = ifelse((gender == 2), 1, 0)) %>%
+ #male will be the column for male identifying people
+  mutate(male= ifelse((gender ==1), 1, 0)) %>%
+ #nonbinary will be the column for people who do not identify between the conventional gender binary
+  mutate(nonbinary= ifelse((gender ==3), 1, 0))
+
+
+#Finally, I will drop the value over 98 because 98 means "Don't Know" and 99 means "refused"
+#These are around 3.7% of the whole rows 
+#calculated by sum((pew_working$age==99)|(pew_working$age==98))/length(pew_working$age))
+pew_clean <- pew_clean[!(pew_clean$age %in% c(98, 99)), ]
+dim(pew_clean)
+
+```
+
+
+```{r echo=TRUE, results= "asis"}
+#Fit 5 logistic regression models to the five questions about high speed internet access to predict views that not having internet puts people at a disadvantage regarding access to information, family, jobs, school, and medical information.
+#Information on COVID
+model1 <- glm(formula = b_coviddisa ~ income + parent + female + male +nonbinary + age, data = pew_clean, family = binomial ("logit"))
+#Family
+model2 <- glm(formula = b_coviddisb ~ income + parent + female + male +nonbinary + age, data = pew_clean, family = binomial ("logit"))
+#Job
+model3 <- glm(formula = b_coviddisc ~ income + parent + female + male +nonbinary + age, data = pew_clean, family = binomial ("logit"))
+#School
+model4 <- glm(formula = b_coviddisd ~ income + parent + female + male +nonbinary + age, data = pew_clean, family = binomial ("logit"))
+#Medical Information
+model5 <- glm(formula = b_coviddise ~ income + parent + female + male +nonbinary + age, data = pew_clean, family = binomial ("logit"))
+```
+
+
+```{r echo=TRUE, warning=FALSE, results="asis"}
+
+#Print the results in a single table using the stargazer package.
+library("stargazer")
+
+stargazer(model1, 
+          model2, 
+          model3, 
+          model4, 
+          model5, 
+          type = "html",
+          title="Logistic Regression Results", 
+          digits = 2,
+          align=TRUE, 
+          dep.var.labels=c("Information","Family", "Job", "School", "Medical"), 
+          covariate.labels = c("Income","Parent", "Female","Male","Non Binary", "Age"), 
+          omit.stat=c("LL","ser","f"), 
+          no.space=TRUE)
+
+```
+
+
+## 4
+Is there a statistically significant relationship between people's income and their views on any of these five questions about internet access? If not, why might there not be a relationship? If so, interpret the relationship and explain the results.
+
+**A:** Based on the analysis above, income is only statistically relevant when they ask about school work. Only the coefficient of income when asking about school work has a low p-value to be considered as statistically significant. Here, the coefficient of income for the question on school work was 0.08. This represents how much the income affects the likelihood that someone thinking the lack of internet access is a major disadvantage of doing school work. However, it does not directly correspond to the degree of change by unit. This coefficient is a logit value (the log of the probability of event happening over that of the odds). Therefore, if we want to translate logit into the degree of income affect the probability of answering the question on school work, we need to recalculate backward based on the coefficient.
+
+
+## 5
+Is there a statistically significant relationship between sex and people's views on any of these questions about internet access? If not, why might there not be a relationship? If so, interpret the relationship and explain the results.
+
+**A:** Based on the sample and the statistical model, I do not think we can argue that sex is statistically relevant to how people think about internet access as a disadvantage. None of the coefficients of the gender identities (female, male, non-binary), as shown the stargaze chart in problem 3, has low enough p value to be statistically significant. When the value is not statistically significant in the model, it implies that the result may be a random result. Thus, we cannot assume a relationship based on our logistic regression models.
+
+## 6
+Plot all five logistic regression models in a single dotwhisker plot using the dotwhisker package. Add a dotted line at 0. Explain what the plot shows and how to interpret. What are the points? What are the whiskers?
+```{r warning=FALSE}
+library(dotwhisker)
+
+dw_total <- dotwhisker::dwplot(list(model1, model2, model3, model4, model5),
+                               vars_order = c("income", "parent", "female", "male", "age"),
+                               model_order = c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5"))+
+  geom_vline(xintercept = 0, linetype=2)+
+  theme_grey()+
+  labs(  
+    title = "Gender Significantly Affects on How People Think Not Having Internet Access \nis a Major Disadvantage for School Work",
+    subtitle = "The Coefficiences and their Confidence Interval of the Logistic Regression on the \n likelihood of people thinking not having internet service is a disadvantgage",
+    color = "Topic of Disadvantages",
+    caption = "Source: PEW Internet Core Trends 2021")+
+  xlab ("Estimated Coefficient Values (in logit)")+
+  ylab ("Dependent Variables") + 
+  scale_color_manual(labels = factor(c ("Medical Information", "School", "Jobs", "Family", "Information")), values = c ("#648FFF","#785EF0", "#DC267F", "#FE6100", "#FFB000"))+
+  scale_y_discrete(labels = c("Income", "Parent", "Female", "Male",  "Age")) +
+  theme(text = element_text(family = "Times"))
+
+  
+dw_total
+
+```
+
+I first created the dot-whisker plot for all questions and the variables. The dot-whisker plot represents the estimated coefficients derived by the logistic regression models. These estimated coefficient reflect the relationship between each variable and the likelihood that one thinks the lack of high speed internet is a significant deficiency in each topic. The exact estimated value of the coefficient is illustrated as a dot in the dot-whisker plot. When the estimated coefficient is 0, it means that the there is no relationship between the variable and the answers. Thus, we need to check if there is any possibility that the estimated coefficient could be 0 by checking the confidence interval, represented by the whisker in the plot. \
+
+In this plot, it is hard to recognize if the confidence interval includes 0 or not except for the coefficient of female/male in terms of the answer on school work. In fact, these coefficients have exceptionally large absolute values, leading the scale of the graph to be inconvenient. These values also do not pass 0, but we need to remind ourselves that the p value was high enough that we need to consider this relationship as a product of chances. To have a better understanding of other coefficients, I drafted the graphs below. \
+
+```{r}
+dw_no4 <- dotwhisker::dwplot(list(model1, model2, model3, model5)) +
+  geom_vline(xintercept = 0, linetype=2)+
+  theme_grey()+
+  labs(  
+    title = "Gender and Parenthood may not be Statistically Relevent in topics other from School",
+    subtitle = "The Coefficiences and their Confidence Interval of the Logistic Regression on the \n likelihood of people thinking not having internet service is a disadvantgage",
+    color = "Topic of Disadvantages",
+    caption = "Source: PEW Internet Core Trends 2021")+
+  xlab ("Estimated Coefficient Values (in logit)")+
+  ylab ("Dependent Variables") + 
+  scale_color_manual(labels = factor(c ("Medical Information", "Jobs", "Family", "Information")), values = c ("#648FFF", "#DC267F", "#FE6100", "#FFB000"))+
+  scale_y_discrete(labels = c("Income", "Parent", "Female", "Male",  "Age")) +
+  theme(text = element_text(family = "Times"))
+
+dw_no4
+```
+
+In this graph, I excluded the logistic regression on the question of school work. Now, we can see the other coefficients, particularly those of gender and  parenthood. In fact, the whiskers of all coefficients with gender(female, male, parent) pass 0. In other words, the confidence interval intersect with 0, implying the possibility of not having a relationship with the survey answers.
+
+```{r warning=FALSE}
+dw_income_age<- dotwhisker::dwplot(list(model1, model2, model3, model4, model5), 
+                                   vars_order = c("income", "age"),
+                                   model_order = c("Model 1", "Model 2", "Model 3", "Model 4", "Model 5")) +
+  theme_grey() +
+  geom_vline(xintercept = 0, linetype=2)+
+  labs(  
+    title = "Income has significant affect on how people think \nNo Internet Service as a Disadvantage",
+    subtitle = "The Coefficiences and their Confidence Interval of the Logistic Regression \non the likelihood of people thinking not having internet service is a disadvantgage",
+    color = "Topic of Disadvantages",
+    caption = "Source: PEW Internet Core Trends 2021")+
+  xlab ("Estimated Coefficient Values (in logit)")+
+  ylab ("Dependent Variables") + 
+  scale_color_manual(labels = factor(c ("Medical Information","School", "Jobs", "Family", "Information")), values = c ("#648FFF","#785EF0", "#DC267F", "#FE6100", "#FFB000"))+
+  scale_y_discrete(labels = c("Income", "Age")) +
+  theme(text = element_text(family = "Times"))
+  
+dw_income_age
+```
+
+Finally, I only put age and income to observe their relationship with the survey answers. We can see the confidence levels of all coefficients of income do not pass 0. Thus, income is likely to have a relationship with the likelihood that someone thinks the lack of high speed internet is a major disadvantage in all topics. On the other hand, only the coefficient of age in the topic of school does not pass 0. Hence, we can only safely assume that age is statistically related with the survey response on school work.
+
+## 7
+Using the predict() function: What is the predicted probability (and 95% lower and upper bound confidence intervals) that a low income individual (with other variables set to their median values) believes lack of access to high speed internet puts people at disadvantage for getting school work done? What is the predicted probability (and 95% lower and upper bound confidence intervals) that a high income individual (with other variables set to their median values) believes lack of access to high speed internet puts people at disadvantage for getting school work done?
+
+```{r}
+#Create a dataframe for the value that I want to compare
+  new_df <- data.frame(income = c(1:10),
+                       parent = median(pew_clean$parent, na.rm = TRUE),
+                       female = median(pew_clean$female, na.rm = TRUE), 
+                       male = median(pew_clean$male, na.rm = TRUE), 
+                       nonbinary = median(pew_clean$nonbinary, na.rm = TRUE),
+                       age = median(pew_clean$age, na.rm = TRUE)
+                       )
+
+#Use the predict() function
+  ppfunction <- function (new_df, model){
+    prediction <- cbind(new_df, predict(model, new_df, type = "response", se.fit = TRUE))
+    prediction$higher <- prediction$fit + (prediction$se.fit*1.96)
+    prediction$lower <-  prediction$fit - (prediction$se.fit*1.96)
+    prediction
+  }
+
+#For this question, I took out two values (parent and nonbinary) from the data as they returned NA in the regression model and prevented the predict function to work.)  
+model4 <- glm(formula = b_coviddisd ~ income  + female + male + age, data = pew_clean, family = binomial ("logit"))
+
+result  <- ppfunction(new_df, model4)
+result
+
+```
+
+The predicted probability of all 10 income levels are represented in the table above. The fit column demonstrates the predicted probability based on each income group. The higher and the lower columns represents the each end of 95% lower and upper bound confidence intervals. \
+
+The answer to this question also depends on what one would define lower income individual and higher income individual. Here, I will compare the individual in income group 1 and group 10. \
+
+**Group 1(family income less than $10,000)**
+Predicted Probability: 0.6989759
+Confidence Interval: 0.6289098~0.7690421
+
+**Group 10(family income more than $200,000)**
+Predicted Probability: 0.8232390
+Confidence Interval: 0.7859170~0.8605610
+
+
+## 8
+Plot the predicted probability and 95% confidence intervals that an individual believes lack of access to high speed internet puts people at disadvantage for getting school work done across the range of income values. Set other variables to their median values.
+```{r}
+ggplot(result, aes(x= factor(income), y =fit, color = factor(income))) + 
+  geom_point()+
+  geom_errorbar(aes(ymax= higher, ymin=lower), width=0.25)+
+  theme_grey()+
+  labs(title="Higher The Income, More Likely to Believe that Lack of Access to High Speed Internet is a Disadvantage",
+    subtitle= "Predicted Probability of Answering that Lack of Access to High Speed Internet Puts People at Disadvantage based on Income",
+    caption = "Source: PEW Internet Core Trends 2021")+
+  xlab("Total Family Income (Before Tax)")+
+  ylab("Predicted Probability") +
+  scale_x_discrete(labels= c("<10,000", "10,000~20,000", "20,000~30,000", "30,000~40,000", "40,000~50,000", "50,000~75,000","75,000~100,000", "100,000~150,000", "150,000~200,000", "200,000<"))+
+  scale_y_continuous(limits = c(0,1)) +
+  theme(text = element_text(family = "Times"),
+        plot.title = element_text(size = 11),
+        plot.subtitle = element_text(size = 9),
+        legend.position = "none",
+        axis.text.x = element_text(angle = 45, vjust=0.5) )
+```
+
+
+## 9
+Are females significantly more likely than males to say that lack of high speed internet puts people at a disadvantage for getting school work done across all age groups? How can you test whether the relationship between sex and beliefs about high speed internet is significant across all age groups?
+
+We can check how much age affects the impact of being female or male by setting a conditional hypothesis. These will be our two alternative hypotheses.
+
+**Alternative Conditional Hypothesis 1:** The relationship between female and the likelihood to answer that lack of high speed internet puts people at a disadvantage is conditional upon age, controlling for income and parenthood
+
+**Alternative Conditional Hypothesis 2:** The relationship between male and the likelihood to answer that lack of high speed internet puts people at a disadvantage is conditional upon age, controlling for income and parenthood
+
+Therefore, the process will be 
+1) We will create logistical models based on these two factors \
+2) We will check if the age is relevant in all age group by looking at the coefficients 
+3) We will predict the change in probability based on the coefficients and compare between male and female.
+
+```{r, results='asis'}
+library("stargazer")
+
+cond_model_f <- glm(b_coviddisd ~ age * female +income +parent , data = pew_clean, family = binomial("logit"))
+cond_model_m <- glm(b_coviddisd ~ age * male +income + parent, data = pew_clean, family = binomial("logit"))
+cond_model_n <- glm(b_coviddisd ~ age * nonbinary +income + parent, data = pew_clean, family = binomial("logit"))
+
+stargazer(cond_model_f, type="html",
+          title="Interaction between Female Identity and Age, when controlling Income and Parenthood", 
+          digits = 2,
+          align=TRUE,
+          dep.var.labels= c("likelihood to answer that lack of high speed internet puts people at a disadvantage")
+          )
+
+stargazer(cond_model_m, type="html",
+          title="Interaction between Male Identity and Age, when controlling Income and Parenthood", 
+          digits = 2,
+          align=TRUE,
+          dep.var.labels= c("likelihood to answer that lack of high speed internet puts people at a disadvantage")
+          )
+
+stargazer(cond_model_n, type="html",
+          title="Interaction between Nonbinary Gender Identity and Age, when controlling Income and Parenthood", 
+          digits = 2,
+          align=TRUE,
+          dep.var.labels= c("likelihood to answer that lack of high speed internet puts people at a disadvantage")
+          )
+
+```
+
+
+In order to know the significance of being a male, female, or non-binary and the belief, we need to see if the relationship happens on the first hand by checking the confidence intervals.
+
+```{r warning=FALSE}
+#References: https://cran.r-project.org/web/packages/dotwhisker/vignettes/kl2007_examples.html
+
+
+results_df <- data.frame(term = c("age:female", "age:male", "age:non_binary"),
+                         estimate = c(cond_model_f$coefficients[6], cond_model_m$coefficients[6], cond_model_n$coefficients[6]),
+                         std.error = c(summary(cond_model_n)$coefficients[5, 2], 
+                                       summary(cond_model_m)$coefficients[5, 2], 
+                                       summary(cond_model_n)$coefficients[5, 2]),
+                         model = c("cond_model_f", "cond_model_m", "cond_model_n"),
+                         stringsAsFactors = FALSE)
+
+results_df
+
+dw_interaction_total<- dotwhisker::dwplot(results_df) +
+  theme_grey() +
+  geom_vline(xintercept = 0, linetype=2)+
+  labs(  
+    title = "Yet to Prove: The impact age has on the degree that gender identity affects the perception on \nthe Lack of Internet Access as Disadvantage in Doing Schoolwork",
+    subtitle = "The coefficients and their confidence interval between gender identity and age",
+    color = "Gender Identity",
+    caption = "Source: PEW Internet Core Trends 2021")+
+  xlab ("Estimated Coefficient Values (in logit)")+
+  ylab ("Interaction between Gender and Age") + 
+  theme(text = element_text(family = "Times")) +
+  scale_color_discrete(labels = c("Female", "Male", "Non-binary"))
+
+dw_interaction_total
+```
+
+Here, we can check that none of the coefficients for the interaction actually have the confidence intervals that does not include 0. As a result, 
+
+
+```{r}
+library("ggpubr")
+library("interplot")
+summary(cond_model_f)
+pred1<- interplot(cond_model_f, var1="female", var2 = "age", predPro = TRUE, var2_vals = 1)
+pred2 <- interplot(cond_model_m, var1="male", var2 = "age", predPro = TRUE,  var2_vals = 1)
+
+pred1
+
+ggarrange(pred1, pred2, labels = c("Female", "Male"))
+```
+
+
+## 10
+Include an interaction between female and age and fit a new model predicting people's belief that lack of high speed internet puts people at a disadvantage for getting school work. Is the interaction statistically significant? If not, how do you interpret the results? If so, plot and interpret the interaction using the interplot package.
+
+```{r, results='asis'}
+library("interplot")
+interplot(cond_model_f, var1="female", var2 = "age", predPro = FALSE)+
+    geom_hline(yintercept = 0, linetype = "dashed") +
+    labs(
+      title = "The interaction between the age and female identity happens in a Reverse Direction",
+      substitle= "Interaction between age and female on response on school work"
+    ) +
+  theme(text = element_text("Times"))
+
+```
+
+```{r}
+interplot(cond_model_m, var1="male", var2 = "age") +
+      geom_hline(yintercept = 0, linetype = "dashed")+
+  labs(
+      title = "The interaction between the age and male identity happens in a Positive Direction",
+      substitle= "Interaction between age and male on response on school work"
+    ) +
+    theme(text = element_text("Times"))
+```
+
+Since both graph shows that the coefficient passes 0 in a certain age, we cannot assume that the interaction is significant in every level.
