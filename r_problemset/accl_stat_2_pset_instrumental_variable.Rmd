@@ -1,0 +1,178 @@
+---
+title: "pset_iv_mk2215"
+author: "MinAh Kim"
+date: "2023-05-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Clean environment & set the working directory
+rm(list=ls())
+setwd("/Users/minahkim/Documents/Winter2023/PPOL561")
+
+# Import Library
+library(tidyverse)
+library(statar)
+library(ggplot2)
+library(ivreg)
+
+```
+### Q1
+#### Load the data into R and confirm that you have 50,000 observations and that the variables are lnearn (log earnings), female (indicator for female), S (years of schooling), xpr (years of experience), xpr2 (years of experience squared), and compulsoryS (years of compulsory schooling in the individual’s state)..
+
+```{r}
+# load data
+df <- read_csv("iv_problem_set.csv")
+
+# We observe 50000 rows and 6 columns in this dataset.
+dim(df)
+
+# Through the head function, we can see that this dataset includes female, S, compulsoryS, xpr, xpr2 and lnearn
+head(df)
+```
+
+### Q2
+#### Regress log earnings on female, year of schooling, years of experience and years of experience squared. What is the impact on earnings of a 1 year increase in schooling? Can you reject the hypothesis that the return to schooling is 0?
+
+```{r}
+# Regressing log earnings on female, year of schooling (S), years of experience (xpr), and the squared years of experience(xpr2)
+basic_reg = lm(lnearn ~ female + S + xpr+ xpr2, data = df)
+
+# The result of the regression
+summary(basic_reg)
+```
+
+Yes, we can reject the null hypothesis based on the linear regression. The high t value and a low p value demonstrate the results are statistically significant.
+ 
+```{r}
+#Impact on log earning of 1 yr increase in schooling
+inc_lnearn <- summary(basic_reg)$coefficients[3,1]
+
+#Impact on earning of 1 yr increase in schooling
+print(paste("One year increase in schooling leads to ", exp(inc_lnearn), "increase in earning"))
+```
+
+
+ 
+### Q3
+#### Explain why this estimate may be biased due to endogeneity.
+
+One possible factor of endogeneity is the family socioeconomic background. It may not be the year of schooling that determines the earning. Instead, a person may come from a more affluent family backgorund and therefore more likely to get a high earning job.  
+
+### Q4
+#### Now suppose that we think state compulsory schooling is an instrument for years of schooling. Explain the intuition behind the statistical conditions that have to be satisfied for this variable to be a valid instrument for years of schooling.
+
+Here, there are two underlying assumption. First, the years of state compulsory schooling and the year of schooling is correlated. Second, the years of state compulsory schooling does not affect one's log earning. Since the years of state compulsory schooling would have no influence on one's earning, the estimated year of schooling from the years of state compulsory schooling would have been not a result of any of the factors that can affect the earning. Thus, if this set of estimation is still relevant to the log earning, it means that this relationship is not caused by other candidates of endogeneity.
+
+
+
+### Q5
+#### Present a graphical analysis to plot the first stage and reduced form results. How does this graphical analysis motivate the instrumental variables strategy?
+
+```{r}
+# bring the xtile command from the statar package
+# create twenty percentile bins of distance
+df$compulsoryS_bin <- xtile(df$compulsoryS, 20)
+```
+
+```{r}
+# Preparing data for the first stage graph
+first_stage <- df %>%
+  group_by(compulsoryS_bin) %>%
+  summarise(avg_school = mean(S), avg_comp = mean(compulsoryS_bin))
+
+#Graphing the First stage plot
+ggplot(data = first_stage, aes(x = avg_comp, y = avg_school)) +
+  theme_bw()+
+  geom_point(color = "darkblue")+
+  labs(
+    title = "The Positive Correlation between Compulsory Education and the Schooling",
+    subtitle = "The first stage graph, aggregated in 5% percentile bin level",
+    x = "Years of Compulsory Schooling in the Individual’s State",
+    y = "Average Year of Schooling"
+  )+
+  ylim(min(first_stage$avg_school)-0.01,max(first_stage$avg_school)+0.01)
+```
+
+```{r}
+# Preparing data for the reduced form plot
+rd_form_plot <- df %>%
+  group_by(compulsoryS_bin) %>%
+  summarise(avg_earning = mean(lnearn), avg_dist = mean(compulsoryS))
+
+# Graphing the Reduced Form Plot
+ggplot(data = rd_form_plot, aes(x = avg_dist, y = avg_earning)) +
+  theme_bw()+
+  geom_point(color = "darkred")+
+  labs(
+    title = "The Positive Correlation between Compulsory Schooling and the Earning",
+    subtitle = "The reduced form plot, aggregated in 5% percentile bin level",
+    x = "Average Years of State Compulsory Schooling",
+    y = "Average Log Earning"
+  )+
+  ylim(min(rd_form_plot$avg_earning)-0.01,max(rd_form_plot$avg_earning)+0.01)
+```
+
+From the first stage plot, we can observe a positive correlation between the year of state compulsory schooling and the average year of schooling. Thus, we can find out that the potential instrument(year of compulsory schooling) variable and the variable of interest(year of schooling) have a correlation, one of the two necessary assumption to apply the instrument variable. If the instrumental variable and variable of interest has positive correlation, then the instrumental variable (compulsory schooling) and the dependent variable (log earning) should have similar relationship between the variable of interest (year of schooling) and the dependent variable (log earning). Our Reduced Form Plot does show a positive correlation between the compulsory schooling and log earning, which aligns to the result of Q2 that the year of schooling and the log earning is positively correlated. Thus, we can apply compulsory schooling as an instrumental variable for this analysis 
+
+### Q6
+#### Estimate the first stage regression. Is compulsory schooling a statistically significant predictor of schooling?
+```{r}
+# First stage regression
+first_stage_reg <- lm(S ~ compulsoryS + xpr + xpr2 + female, data = df)
+
+summary(first_stage_reg)
+
+```
+Yes, from the t value and the p value of the regression, we learn that the compulsory schooling has a statistically significant positive correlation with the years of schooling
+
+### Q7
+#### Use ivreg to implement the IV estimator in which we instrument for schooling using compulsory schooling. What are your results? How does the IV estimate for the return to schooling compare to the OLS estimate?
+
+```{r}
+# Run a regression while implementing an instrumental variable 
+iv_reg <- ivreg(lnearn ~ female + xpr+ xpr2 |S| compulsoryS, data = df)
+
+summary(iv_reg)
+```
+```{r}
+print(paste("The coefficient of S without instrumental variable: ", summary(basic_reg)$coefficients[3,1]))
+print(paste("The coefficient of S with instrumental variable: ", summary(iv_reg)$coefficients[2,1]))
+
+```
+
+The fixed effect regression applying compulsory schooling as an instrumental variable shows that the positive correlation between the year of schooling and log earning is statistically significant. Originally, we expected an upward bias because we expect that the year of schooling incorporate factors other than the pure effect of the year of schooling. However, the coefficient with the instrument actually increases. This result may be due to the "Local Average Treatment Affect" since we are using the estimated year of schooling based on the year of compulsory schooling instead of the original data on the year of schooling. 
+
+### Q8
+#### Suppose that we think the return to schooling varies by gender and we want to instrument for the female*S interaction term using compulsory schooling interacted with gender. Estimate the first stage regressions (note that we have 2 variables that need to be instrumented). Do we have a valid instrument for each variable that needs to be instrumented?
+
+```{r}
+# First Stage for female*S
+df_interact <- df %>%
+  mutate(
+    female_s = female * S
+  )
+
+first_stage_int <- lm(female_s ~ compulsoryS*female + xpr + xpr2, data = df_interact)
+summary(first_stage_int)
+
+```
+
+The correlation between the interaction between female and year of schooling and the interacton of compulsory schooling and female is statistically significant. We wants the t value of this correlation to be higher than 3, and this regression shows that it satisfies the condition. (t value is 18.767)
+
+### Q9
+#### Estimate the IV results related to the first stage regressions in (8). Can we reject the hypothesis that the IV estimate of the coefficient on female*S is 0? What are the conclusions about whether the return to schooling varies based on gender or not?
+
+```{r}
+ivreg_int <- ivreg(lnearn ~ xpr+ xpr2 |female_s| female*compulsoryS, data = df_interact)
+summary(ivreg_int)
+
+```
+
+We can reject the null hypothesis as the coefficient of interaction of female and year of schooling is statistically significant, which infers that it is very likely that there is a relationship between the log earning and the value that represents the interaction of female and year of schooling. This results shows that the log earning increases around 9.04 (addition of the intercept 8.94 + interaction term 0.10) for every additional year when you are a woman. It also tells us that being a woman means that your log earning will increases 0.0991921 more for each year than identifying as other genders.
+
+

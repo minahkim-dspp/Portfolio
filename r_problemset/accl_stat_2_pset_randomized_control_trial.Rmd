@@ -1,0 +1,311 @@
+---
+title: "Problem Set 1"
+author: "MinAh Kim"
+date: "2023-04-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r import, echo = T, results = 'hide'}
+#########################################################
+## 0) Import CSV file & packages
+
+# remove environment list
+rm(list=ls())
+
+# import library
+library(tidyverse)
+library(miceadds)
+library(ggplot2)
+
+# import data set
+df <- read.csv("rct_problem_set.csv")
+```
+
+```{r explore_data}
+# explore the data set
+head(df)
+dim_df <- dim(df)
+```
+
+
+### Q1 Start by regressing the outcome of interest, attend, on the treatment indicator. What are your preliminary results? How does accounting for the clustered randomization design affect your preliminary results?
+
+```{r q1_regression_cluster}
+# First, I will identify each cluster by making a variable
+df_regress <- df %>%
+                mutate(cluster_id = group_indices(df, .dots = c("school_id", "grade")))
+```
+
+
+```{r q1_regression}
+# linear regression with the outcome (attend) and the individual treatment status (treatment)
+notclustered = lm(attend ~ treatment, data = df_regress)
+
+# linear regression with the outcome (attend) and the treatment status by cluster
+clustered = lm.cluster(attend ~ treatment, data = df_regress, cluster = "cluster_id")
+```
+
+Let's first check the result of the regression on attendance and treatment status.
+
+```{r}
+# summary of regressing attendance on treatment
+summary(notclustered)
+```
+  
+Based on the initial regression, we found statistically significant relationship between the treatment status and attendance. Based on the t-value, we learn that the control and the treatment are significantly different from each other. The low p value also shows that this difference is very unlikely to happen by chance. 
+
+```{r}
+# summary of regressing attendance on treatment with clusters
+summary(clustered)
+```
+ 
+When we recognize the cluster, we can notice that the coefficient of the regression does not change. The t value and the p value also demonstrate that the regression still shows statistical significance. 
+  
+However, there has been a change in the standard error. This change is expected as the number of clusters is smaller than the number of individual treatment status. In the data set, there are 1945 unique combination of the school_id and the grade. Since the number of individuals is much greater than the cluster, recognizing the cluster should introduce more variance in the result. Here, the standard error did not decrease, but it still went through some changes even though we are running the same regression with the same dataset.
+  
+### Q2 Check for balance between the treatment and control observations based on age, gender, math scores and reading scores. Are these observables balanced across the treatment and control groups?
+ 
+```{r age_balance}
+## let's check balance based on age first!
+# We run a regression between treatment status and age to see if there is any significant pattern 
+age_balance = lm.cluster(age ~ treatment, data = df_regress, cluster = "cluster_id")
+summary(age_balance)
+
+```
+In order to check the balance between the treatment and the control based on age, I run the regression on the treatment by the age variable in the data set. Here, we can observe a low t value and a high p value, which imply that these two values have no statistically significant relationship. Therefore, we can think that the distribution of age differ by the treatment status.
+
+Let's check the balance based on other attributes by repeating the same method.
+  
+```{r female_balance}
+## Checking the balance based on gender (more precisely, if the individual is female or not)
+# We run a regression between treatment status and the female variable 
+female_balance = lm.cluster(female ~ treatment, data = df_regress, cluster = "cluster_id")
+summary(female_balance)
+```
+Here, the regression on treatment status by the variable female demonstrates is not statistical significant. The absolute value of the t value is smaller than 2, and the p value is larger than 0.05. From this result, we can infer that the control is more likely to have female compared to the treatment. In other words, the gender is not balanced across the treatment and the control group.  
+  
+Now, let's check the balance based on the math score. 
+
+```{r math_balance}
+# Checking the balance based on math score
+math_balance = lm.cluster(math ~ treatment, data = df_regress, cluster = "cluster_id")
+summary(math_balance)
+```
+After running the regression, we do not find any statistical significance between the math score and the treatment status. The t value is low and the p value also tells that this result is more than 20% likely to be caused by random chance. As a result, we cannot infer that the distribution of math score differs based on the treatment and the control group.
+  
+```{r reading_balance}
+reading_balance = lm.cluster(read ~ treatment, data = df_regress, cluster = "cluster_id")
+summary(reading_balance)
+```
+We are finally checking the balance on reading score between the treatment and the control group. Again, the regression does not show any statistical significance between the two group. Hence, we can continue to assume that the treatment and control is balance based on the reading score.
+
+### Q3 Check if there are observations that are missing outcome data. If there are any, does this attrition appear random or not?
+
+This question is asking us about attrition, or the participants' drop-out after the randomization. The dataset represents attrition by using the NA value in the 'attend' column. We will create a column "attrition" to record the missing outcome value as 1 and else as 0.
+  
+In order to check the randomness of the attrition, I will use regression to reveal any meaningful difference.
+  
+```{r attrition}
+# Let's create a column for attrition (1 when the attendance is NA)
+df_regress$attrition <- ifelse(is.na(df_regress$attend), 1, 0)
+
+attrition_randomness = lm(attrition ~ treatment, data = df_regress)
+summary(attrition_randomness)
+
+```
+The regression has a low t value and the high p value that would not qualify to be statistically significant. Therefore, we can continue assuming that the attrition is random.   
+  
+### Q4 Implement a permutation test to assess the credibility of your estimated treatment effect. Include a plot of the distribution of estimates from your permutation samples and mark your estimate based on the actual data in this distribution. What fraction of estimates from your permutation test have higher estimated treatment effects that the estimate based on the actual data?  
+  
+The permutation test checks if the difference between the control and the treatment is not a product of random chance. We first randomly assigns the treatment status and calculate the result like how we did it in Question 1. Then, we will find the distribution of the results and then compare the likelihood that our result came out by chance. 
+  
+```{r}
+## 1. Randomly assign the treatment status
+# First let's check the distribution of the assignment by checking the distribution of the treatcluster variable
+num_cluster <- length(unique(df_regress$cluster_id))
+num_treat <- length(unique(df_regress$cluster_id[df_regress$treatcluster == 1]))
+num_control <- num_cluster - num_treat
+
+cat(paste("The number of clusters originally assigned to a control group:", num_control, "\nThe number of clusters originally assigned to a treatment group:", num_treat))
+```
+
+
+```{r echo = T, results = 'hide'}
+# matrix to save the coefficients of each trial
+reps = num_cluster
+CoefMatrix	= matrix(NA, reps, 1)
+
+# loop to randomly assign treatment status
+for (i in c(1:reps)) {
+  # choose the cluster to randomly assign treatment status
+  random_cluster_treatment <- sample(c(1:num_cluster), num_treat, replace = FALSE) 
+
+  # assign the treatment status and save it in random_treatment
+  df_regress<- df_regress %>%
+    mutate(random_treatment = ifelse(cluster_id %in% random_cluster_treatment, 1, 0))
+
+  #run a regression
+  random_regression = lm.cluster(df_regress, attend ~ random_treatment, cluster = "cluster_id")
+
+  #save it in a matrix
+  CoefMatrix[i, 1] <- summary(random_regression)[2,1]
+
+}
+
+```
+```{r}
+# plot the result
+df_graph = data.frame(coefficient = CoefMatrix)
+original_coeff = summary(clustered)[2,1]
+ggplot(data = df_graph, aes(x= coefficient)) +
+  theme_bw()+
+  geom_density(fill = "lightblue", color ="lightblue") +
+  geom_vline(aes(xintercept = mean(coefficient)), linetype = "dashed", size = 0.6, color = "blue")+
+  annotate("text", x=mean(df$coefficient), y=20, label="Mean", angle=90)+
+  geom_vline(aes(xintercept = original_coeff), linetype = "solid", size = 0.6, color = "red") +
+  annotate("text", x=mean(df$coefficient), y=20, label="Estimate based on actual data", angle=90)+
+  labs(
+    title = "The original coefficient is very unlikely to be derived by a random chance",
+    subtitle = "The result of the permutation test",
+    x = "The Value of Coefficients",
+    y = "Density"
+  )+
+  theme(text = element_text(family = "Times"), 
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5) 
+        )
+```  
+  
+```{r}
+df_graph <- df_graph %>%
+  add_row(data.frame(coefficient =c(original_coeff))) %>%
+  arrange(coefficient)
+
+print(paste("Only ", (dim(df_graph)[1] - mean(which(df_graph$coefficient == original_coeff)))/dim(df_graph)[1]*100, "% of the estimates from the permutation have higher estimatedd treatment effects than that based on the actual data"))
+```
+
+### Q5 Now suppose that you learn that, in addition to being clustered at the school and grade level, you learn that the randomization varied treatment intensity within treatment clusters. The treatcluster variable captures which school-grades were assigned to treatment and which were assigned to control. Within the treated clusters, the clusters were randomly assigned to groups 1, 2, 3, 4 and 5, with the fraction of observations within these clusters assigned to treatment varying from 20%, 40%, 60%, 80% and 100% respectively.
+  
+#### a. To test for peer effects from the treatment, create two sets of indicator variables: (1) indicator variables for treatment observations within each treated cluster group and (2) indicator variables for observations within each treated cluster group. Regress the attend outcome variable on these indicators.
+
+
+```{r}
+# create the indicator variables for treatment observations within each treated cluster group and the observations within each treated cluster group.
+# I call the indicator variables direct_treat and indirect_treat for the directly treated and indirectly treated variable
+
+df_regress <- df_regress %>%
+  mutate(
+    direct_treat = ifelse((treatcluster == 1)& (treatment == 1), 1, 0),
+    indirect_treat = ifelse((treatcluster == 1) & (treatment == 0), 1, 0)
+  )
+
+# Regress the attend outcome variable on these indicators.
+peer_effect = lm.cluster(attend ~ direct_treat + indirect_treat, data = df_regress, cluster = "cluster_id")
+
+summary(peer_effect)
+```
+  
+#### b. Plot the coefficients on the direct treatment effects (y-axis) against the fraction treated (x-axis). How do the direct treatment effects vary with the fraction treated?
+
+```{r}
+## Let's run the separate regression for all five groups
+# For Group 1 (Treatment for 20%)
+df_regress_1 <- df_regress %>%
+  filter((treatcluster_group == 1)|(treatcluster_group == 0))
+
+group_1_reg = lm.cluster(attend ~ direct_treat + indirect_treat, data = df_regress_1, cluster = "cluster_id")
+
+summary(group_1_reg)
+
+```
+```{r}
+# For Group 2 (Treatment for 40%)
+df_regress_2 <- df_regress %>%
+  filter((treatcluster_group == 2)|(treatcluster_group == 0))
+
+group_2_reg = lm.cluster(attend ~ direct_treat + indirect_treat, data = df_regress_2, cluster = "cluster_id")
+
+summary(group_2_reg)
+```
+```{r}
+# For Group 3 (Treatment for 60%)
+df_regress_3 <- df_regress %>%
+  filter((treatcluster_group == 3)|(treatcluster_group == 0))
+
+group_3_reg = lm.cluster(attend ~ direct_treat + indirect_treat, data = df_regress_3, cluster = "cluster_id")
+
+summary(group_3_reg)
+```
+```{r}
+# For Group 4 (Treatment for 80%)
+df_regress_4 <- df_regress %>%
+  filter((treatcluster_group == 4)|(treatcluster_group == 0))
+
+group_4_reg = lm.cluster(attend ~ direct_treat + indirect_treat, data = df_regress_4, cluster = "cluster_id")
+
+summary(group_4_reg)
+```
+
+```{r}
+# For Group 5 (Treatment for 100%)
+df_regress_5 <- df_regress %>%
+  filter((treatcluster_group == 5)|(treatcluster_group == 0))
+
+group_5_reg = lm.cluster(attend ~ direct_treat + indirect_treat, data = df_regress_5, cluster = "cluster_id")
+
+summary(group_5_reg)
+```
+```{r echo = T, results = 'hide'}
+# Create a dataframe with each group and the estimated direct_treatment effect
+peer_effect_graph <- data.frame (
+  fraction_treated = c(0.2, 0.4, 0.6, 0.8, 1.0),
+  direct_treatment = c(summary(group_1_reg) [2,1], summary(group_2_reg) [2,1], summary(group_3_reg) [2,1], summary(group_4_reg) [2,1], summary(group_5_reg) [2,1]),
+  indirect_treatment = c(summary(group_1_reg) [3,1], summary(group_2_reg) [3,1], summary(group_3_reg) [3,1], summary(group_4_reg) [3,1], NA)
+)
+
+```
+```{r}
+ggplot(data = peer_effect_graph, aes(x = fraction_treated, y = direct_treatment)) +
+  theme_bw()+
+  geom_line(color = "red")+
+  geom_point()+
+  labs(
+    title = "The Direct Treatment Does Not Vary Much Based on the Fraction of Observations",
+    subtitle = "Graphing the fraction of observations and the coefficient of direct treatment",
+    x = "Fraction of treated observation",
+    y = "The Estimated Coefficient of Direct Treatment"
+  ) +
+  ylim(0.05, 0.07) +
+  theme(text = element_text(family = "Times"), 
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5) 
+        )
+```
+
+From the graph, we can check that the direct treatment effects varies only slightly. Notice that the range of the y axis is only 0.02 apart. Even the range is twice smaller than the graph of the indirect treatment effect below, the change is significantly more subtle.
+
+#### c. Plot the coefficients on the indirect treatment effects (y-axis) against the fraction treated (x-axis). How do the indirect treatment effects vary with the fraction treated? Overall, what do you conclude about possible peer effects or spillovers from the treatment?
+```{r}
+ggplot(data = peer_effect_graph, aes(x = fraction_treated, y = indirect_treatment)) +
+  theme_bw()+
+  geom_point()+
+  geom_line(color = "blue") +
+  labs(
+    title = "The Indirect Treatment Steadily Increases Based on the Fraction of Observations",
+    subtitle = "Graphing the fraction of observations and the coefficient of indirect treatment",
+    x = "Fraction of treated observation",
+    y = "The Estimated Coefficient of Indirect Treatment"
+  ) + 
+  ylim(0.01, 0.05) +
+  theme(text = element_text(family = "Times"), 
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5) 
+        )
+```
+
+Unlike the coefficient of the direct treatment, the coefficient of the indirect treatment increases proportionally to the fraction of the treated observations increases. From this result, we can check that the degree of spillovers effect is greater as more people are treated in the cluster. 

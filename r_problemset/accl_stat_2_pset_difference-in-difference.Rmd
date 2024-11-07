@@ -1,0 +1,157 @@
+---
+title: "pset_dd_mk2215"
+author: "MinAh Kim"
+date: "2023-04-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Q1
+#### Confirm that you have varying dates of treatment. Explain the intuition of applying the Diff-in-Diff research design in this context to estimate impacts of the program on math test scores. 
+
+We can apply Diff-in-diff because we have information on which and when elementary school teachers received treatment. Here, we are assuming that the treatment was not anticipated, and we can observe a parallel difference bewteen a control and treatment group. If these assumption fail, the Diff-in-diff research design will fail. 
+
+### Q2
+#### Plot average math test scores and the number of aides over calendar year for the treatment and control groups. What does this plot illustrate? For example, are the treatment and control groups similar? Explain why it’s ok if there are differences between the treatment and control groups or why it’s not ok. What sorts of differences between the treatment and control groups would be problematic for the Diff-in-Diff research design, and how do those factors relate to this plot? 
+
+```{r}
+## Clean the Environment
+rm(list=ls())
+setwd("/Users/minahkim/Documents/Winter2023/PPOL561")
+
+## Import packages
+library(tidyverse)
+library(fixest)
+
+## Import data set 
+df <- read_csv("dd_problem_set.csv")
+head(df)
+
+## Check the values & NA of each columns
+summary(df)
+
+## We have three teacher ids that does not have a treatment status. Since the number of aids did not change throughout the years, I suspect that these three teachers were in the control group. However, we do not have the complete information ranging across all years. Furthermore, these 10 lines are only 0.06% of the whole dataset. Therefore, for this problem set, I will drop these ten lines
+unique(df[is.na(df$treatment),"teacherid"])
+df <- df %>%
+  filter(!is.na(treatment))
+```
+
+```{r}
+#Prepare a data to plot the graph with average math test score over calendar year for the two groups
+plotdata = aggregate(df$mathscore, list(df$year, df$treatment), FUN = mean)
+
+plot(plotdata$Group.1[plotdata$Group.2==1],plotdata$x[plotdata$Group.2==1],type="l",col="red",xlab="Year",ylab="Math Score",main="Difference in Math Score taught by teachers in Treatment/Control Group", ylim = c(min(plotdata$x)-50, max(plotdata$x) +50)) 
+lines(plotdata$Group.1[plotdata$Group.2==0],plotdata$x[plotdata$Group.2==0],type="b",col="blue")
+
+legend(2001, 1.00, legend=c("Teachers with A4A aids", "Teachers without A4A aids"),col=c("red", "blue"), lty=1:2, cex=0.8)
+
+
+```
+
+The difference between the treatment and control group in the Math Score is constant throughout the year. This trend is suitable for the diff-in-diff research design because the diff-in-diff research assumes that the treatment and control will have a constant difference without an intervention.
+
+```{r}
+#Prepare a data to plot the graph with average number of aids over calendar year for the two groups
+plotdata_aid = aggregate(df$numaides, list(df$year, df$treatment), FUN = mean)
+
+plot(plotdata_aid$Group.1[plotdata_aid$Group.2==1],plotdata_aid$x[plotdata_aid$Group.2==1],type="l",col="red",xlab="Year",ylab="Number of aids",main="Difference in Number of Aids between Treatment/Control Group") 
+lines(plotdata_aid$Group.1[plotdata_aid$Group.2==0],plotdata_aid$x[plotdata_aid$Group.2==0],type="b",col="blue")
+
+legend(2001, 1.00, legend=c("Teachers with A4A aids", "Teachers without A4A aids"),col=c("red", "blue"), lty=1:2, cex=0.8)
+```
+
+We can observe a divergence in the average number of aids between the control and the treatment group. The difference became more apparent around 2004, but the temporal point when the difference starts to show off is not that important because teachers received aids at all different time. However, this group shows that the treatment assignment did lead to the difference in the number of aids, as the program intended.
+
+### Q3
+#### Using observations for treated teachers only, create time since treatment and plot average math test score by time since treatment. Interpret this graph and explain how it relates to a Diff-in-Diff research design.
+
+```{r}
+df <- df %>%
+  mutate(
+    time_since_treatment = case_when(
+      treatment == 1 ~ year-yr1_treatment,
+      treatment == 0 ~ 0
+      )
+  )
+
+plot_time_since_treatment = aggregate(df$mathscore, list(df$time_since_treatment), FUN = mean)
+
+plot(plot_time_since_treatment$Group.1,plot_time_since_treatment$x,type="l",col="red",xlab="Year",ylab="Math Score",main="Difference in Math Score taught by teachers in Treatment/Control Group") 
+
+lines(plot_time_since_treatment$Group.1[plot_time_since_treatment$Group.2==0],plot_time_since_treatment$x[plot_time_since_treatment$Group.2==0],type="b",col="blue")
+
+legend(2001, 1.00, legend=c("Teachers with A4A aids", "Teachers without A4A aids"),col=c("red", "blue"), lty=1:2, cex=0.8)
+
+
+
+```
+
+The trend demonstrates the average of math score based on the year before/after the intervention. If the intervention increases the math score to the treatment group, then the average math score of the treatment would have been increased after year 0 than our expectation. Indeed, in this graph, we can observe that the range of average math score got higher compared to the points before year 0. Meanwhile, we observe a sudden drop in year 0 because this point indicates the average including the control group. This drop aligns with our understanding because the control group should have lower math scores if the intervention was successful as they did not receive any treatment.
+
+### Q4
+####Plot the $\delta_{k}$ coefficients over time since treatment. Interpret the results illustrated in the plot.
+
+```{r}
+# Use the Fixed Estimate OLS to run the regression for the generalized diff-in-diffs
+
+dd_reg = feols(mathscore ~ i(time_since_treatment, treatment, ref = 0)|schoolid+grade+year, data = df)
+
+# Check the result of the fixed estimate OLS
+summary(dd_reg)
+```
+
+```{r}
+# Plot the delta coefficient
+iplot(dd_reg, xlab = 'Time Since A4A Intervention', main = 'DD Coefficients')
+
+```
+
+The delta coefficient demonstrates the difference between the control and the treatment group over the time since the intervention. Here, we can observe that the average difference in the math score between the control and the treatment group increases after the intervention (or after 0). The difference of math score between the two group widens from the 30 range to the 40~50 range.
+
+### Q5
+#### The A4A program was designed to provide additional teacher aides to teachers, Estimate the above regression specification in (4) using numaides as the outcome variable. Plot the $\delta_{k}$ coefficients over time since treatment. How many additional aides did treated teachers receive after the program took effect?
+
+```{r}
+dd_aid_reg = feols(numaides ~ i(time_since_treatment, treatment, ref = 0)|schoolid+grade+year, data = df)
+
+summary(dd_aid_reg)
+```
+
+```{r}
+iplot(dd_aid_reg, xlab = 'Time Since A4A Involvement', main = 'DD Coefficients for Number of Aides')
+```
+
+From the graph, we can learn that the treated teachers received around 2.0 more aides after the intervention.
+
+### Q6
+#### Ultimately we want to know how much an additional teacher aid increased average math test scores. To do this, your boss suggests estimating the following regression: $y_{it} = \alpha_{0} + \alpha_{1}T_{i}+\beta numaides_{it} + \gamma_{s} + \gamma_{g} + \gamma_{t} + \varepsilon_{it}$ Explain why there may be endogeneity concerns in this regression.
+
+The equation assumes the relationship between the number of aids increased the average math test score based on the calendar year. However, this program called A4A provided support to the teachers in different points. As a result, the increase in the number of aides in a calendar year is not likely to a result of an intervention but a consequence of an unknown factor. Hence, this equation is not adequate to calculate the increase in math test score by each number of aides.
+
+### 7
+#### Use the results from (4) and (5) to answer how much an additional teacher aid increase average math test scores.
+
+```{r}
+# We need to create a separate variable to indicate the data after the treatment
+
+df <- df %>%
+  mutate(
+    after = ifelse(time_since_treatment > 0, 1, 0),
+    after_treatment= after * treatment    
+  )
+
+# 
+trt_reg = feols(mathscore ~ after_treatment|schoolid+grade+year, data = df)
+trt_aid_reg = feols(numaides ~ after_treatment|schoolid+grade+year, data = df)
+
+coefficients(trt_reg)/coefficients(trt_aid_reg)
+
+```
+
+
+
+
+
